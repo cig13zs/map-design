@@ -6,7 +6,7 @@
 |---|---|---|
 | World countries, detailed | `https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json` (TopoJSON) | `id` = ISO 3166 numeric as a string ("608" Philippines), `properties.name` |
 | World countries, light (world views) | `https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json` | same |
-| World countries with ISO alpha-3 | `https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@v5.1.2/geojson/ne_110m_admin_0_countries.geojson` (GeoJSON) | `properties.ADM0_A3`. Not `ISO_A3`: it is `-99` for France and Norway |
+| World countries with ISO alpha-3 | `https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@v5.1.2/geojson/ne_110m_admin_0_countries.geojson` (GeoJSON) | `properties.ADM0_A3`. Not `ISO_A3`: it is `-99` for France and Norway. France includes French Guiana, so it gets colour in South America too |
 | US states | `https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json` | `id` = state FIPS ("06" California) |
 | US counties | `https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/counties-10m.json` | `id` = 5-digit county FIPS |
 
@@ -52,5 +52,8 @@ Free sources that need no key:
 - Rates on choropleths, counts on symbols.
 - Say the year of the data in the source line, and the year differs by country when you use "most
   recent value"; say that too.
+- "Most recent value" can be decades old for some countries (World Bank returns 1990 for a few).
+  Drop values more than about 10 years older than the newest and treat them as no data, or keep the
+  year per country and say the range in the source line.
 - Don't extrapolate, don't fill gaps, don't round away a difference the dek talks about.
 - If the user gives numbers, use theirs and cite them as "Data: user-supplied".

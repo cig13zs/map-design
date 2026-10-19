@@ -28,7 +28,8 @@ a dark card because the empty land is darker than the first bin.
 
 ## Type
 
-- Title: Source Serif 4, 600, 30px. A plain statement of what the map shows, not a pun.
+- Title: Source Serif 4, 600, 30px, sentence case. A plain statement of what the map shows: "Where
+  Brunei is", "Share of people online". No pun, no type prefix ("Locator:", "Map of").
 - Dek: IBM Plex Sans Condensed, 16px, `--muted`. The takeaway or the scope, one line.
 - Place labels: Plex Sans Condensed 13px. End points and the focal place 16px 600.
 - Region labels: 11px, uppercase, letter-spacing about 0.28em, `--region-label`, no halo.
@@ -45,6 +46,7 @@ a dark card because the empty land is darker than the first bin.
 
 ## Layout
 
-The card is 1100px wide, the map viewBox is 1036 x 560 by default. Tall subjects (Chile, Japan, the
+The card is 1100px wide, the map viewBox is 1036 x 560 by default. `shot.py` reads the viewBox and sizes
+the screenshot to fit. Tall subjects (Chile, Japan, the
 Philippines) can use 1036 x 760; a globe usually wants 1036 x 620. Legends sit inside the map frame in
 a corner over sea, never over the subject.

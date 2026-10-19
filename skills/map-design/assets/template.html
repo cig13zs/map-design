@@ -39,10 +39,18 @@ const WORLD_50M = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.
 const WORLD_110M = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
 const NE_110M = 'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@v5.1.2/geojson/ne_110m_admin_0_countries.geojson';
 
-async function world(url = WORLD_50M) {
+// TopoJSON (world-atlas, us-atlas) or GeoJSON (Natural Earth). Antarctica is dropped unless keep is set.
+async function world(url = WORLD_50M, { keepAntarctica = false } = {}) {
   const t = await d3.json(url);
-  return { countries: topojson.feature(t, t.objects.countries),
-           borders: topojson.mesh(t, t.objects.countries, (a, b) => a !== b) };
+  const drop = f => !keepAntarctica && (f.id === '010' || f.properties?.ADM0_A3 === 'ATA');
+  if (t.type === 'Topology') {
+    const obj = t.objects.countries || t.objects.states;
+    const countries = topojson.feature(t, obj);
+    countries.features = countries.features.filter(f => !drop(f));
+    return { countries, borders: topojson.mesh(t, obj, (a, b) => a !== b) };
+  }
+  t.features = t.features.filter(f => !drop(f));
+  return { countries: t, borders: null };  // GeoJSON has no shared arcs: base() strokes each shape instead
 }
 
 // sea, graticule, land, internal borders. Pass sphere=true for globes and world views.
@@ -53,11 +61,12 @@ function base(svg, path, w, { sphere = false, graticule = true, fill = css('--la
   if (graticule) svg.append('path').datum(d3.geoGraticule10()).attr('d', path)
     .attr('fill', 'none').attr('stroke', css('--grat')).attr('stroke-width', .6);
   const land = svg.append('g');
-  land.selectAll('path').data(w.countries.features).join('path').attr('d', path).attr('fill', fill);
-  svg.append('path').datum(w.borders).attr('d', path).attr('fill', 'none')
+  const shapes = land.selectAll('path').data(w.countries.features).join('path').attr('d', path).attr('fill', fill);
+  if (w.borders) svg.append('path').datum(w.borders).attr('d', path).attr('fill', 'none')
     .attr('stroke', css('--border')).attr('stroke-width', .9).attr('stroke-linejoin', 'round');
+  else shapes.attr('stroke', css('--border')).attr('stroke-width', .9).attr('stroke-linejoin', 'round');
   if (sphere) svg.append('path').datum(outline).attr('d', path).attr('fill', 'none').attr('stroke', css('--grat'));
-  return land;
+  return shapes;  // one path per country: shapes.attr('fill', f => ...) recolours them
 }
 
 // text with a halo in the colour underneath, so labels stay readable over lines and borders
@@ -100,6 +109,7 @@ function stepLegend(svg, [x, y], colors, breaks, title, { sw = 46, fmt = d => d 
 
 // nested-circle legend for proportional symbols; r is the same sqrt scale the map uses
 function circleLegend(svg, [x, y], r, values, title, fmt = d => d) {
+  values = [...values].sort((a, b) => b - a);  // largest first, so the title and guides clear it
   const g = svg.append('g').attr('transform', `translate(${x},${y})`);
   g.append('text').attr('y', -2 * r(values[0]) - 10).attr('font-size', 12).attr('font-weight', 600).attr('fill', css('--ink')).text(title);
   values.forEach(v => {

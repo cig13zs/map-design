@@ -16,7 +16,9 @@ A rate or share that varies by area: internet use by country, income per person 
 
 ```js
 const color = d3.scaleThreshold().domain([20, 40, 60, 80]).range(css('--ramp').split(',').map(s => s.trim()));
-land.attr('fill', f => DATA[f.properties.ADM0_A3] == null ? css('--land') : color(DATA[f.properties.ADM0_A3]));
+const w = await world(NE_110M);
+const shapes = base(svg, path, w, { sphere: true });
+shapes.attr('fill', f => DATA[f.properties.ADM0_A3] == null ? css('--land') : color(DATA[f.properties.ADM0_A3]));
 ```
 
 Drop Antarctica. Small island states vanish at 110m; that is expected. Mention it in the source line

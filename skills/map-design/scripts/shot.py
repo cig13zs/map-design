@@ -1,8 +1,9 @@
 """Render a map HTML file to PNG with headless Chrome, Edge or Chromium.
 
-python shot.py map.html [out.png] [--height 760] [--dark]
+python shot.py map.html [out.png] [--height N] [--dark]
+The height defaults to the map's viewBox height plus the card around it.
 """
-import os, shutil, subprocess, sys, tempfile
+import os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 CANDIDATES = [
@@ -24,10 +25,12 @@ def browser():
 
 def main(argv):
     args = [a for a in argv if not a.startswith("--")]
-    height = int(argv[argv.index("--height") + 1]) if "--height" in argv else 760
+    src = Path(args[0] if args else "").resolve()
     if "--height" in argv:
-        args.remove(str(height))
-    src = Path(args[0]).resolve()
+        height = int(argv[argv.index("--height") + 1]); args.remove(str(height))
+    else:
+        vb = re.search(r'viewBox="0 0 (\d+) (\d+)"', src.read_text(encoding="utf-8"))
+        height = (int(vb.group(2)) if vb else 560) + 200  # title, dek, source line and margins
     out = Path(args[1] if len(args) > 1 else src.with_suffix(".png")).resolve()
     url = src.as_uri() + ("#dark" if "--dark" in argv else "")
     with tempfile.TemporaryDirectory() as prof:
