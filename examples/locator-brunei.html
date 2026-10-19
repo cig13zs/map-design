@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en" data-theme="light"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map title</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #f3efe6; --card: #fbf8f1; --ink: #2a2723; --muted: #5c564d; --faint: #8a8378;
+    --sea: #d7e3e8; --grat: #c6d4da; --land: #e4ddcf; --land-2: #d8cfbd; --border: #fbf8f1;
+    --accent: #b8322a; --accent-2: #e08a5f; --region-label: #a59b8a; --halo: #e4ddcf;
+    --ramp: #f4e3c7, #ebbd8f, #d98a5e, #b8552f, #7f2a1d;
+  }
+  [data-theme="dark"] {
+    --page: #0e1116; --card: #151a21; --ink: #ece6da; --muted: #a9a294; --faint: #7d776c;
+    --sea: #10161d; --grat: #1c2530; --land: #262d36; --land-2: #313a45; --border: #151a21;
+    --accent: #f0a04b; --accent-2: #f6c98f; --region-label: #6f7782; --halo: #262d36;
+  }
+  body { margin: 0; background: var(--page); color: var(--ink); font-family: 'IBM Plex Sans Condensed', sans-serif; }
+  .card { width: 1100px; margin: 24px auto; background: var(--card); padding: 28px 32px 18px; border-top: 6px solid var(--accent); box-sizing: border-box; }
+  h1 { font: 600 30px/1.1 'Source Serif 4', serif; margin: 0 0 4px; }
+  .dek { font-size: 16px; color: var(--muted); margin: 0 0 12px; }
+  .src { font-size: 12px; color: var(--faint); margin-top: 6px; }
+  svg { display: block; width: 100%; height: auto; }
+  svg text { font-family: 'IBM Plex Sans Condensed', sans-serif; }
+</style></head><body>
+<div class="card">
+  <h1 id="title"></h1><p class="dek" id="dek"></p>
+  <svg id="map" viewBox="0 0 1036 560"></svg>
+  <p class="src" id="src"></p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+// ---- helpers: copy as-is, then write one draw() per map ----
+if (location.hash === '#dark') document.documentElement.dataset.theme = 'dark';
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const W = 1036, H = 560;
+const WORLD_50M = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json';
+const WORLD_110M = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
+const NE_110M = 'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@v5.1.2/geojson/ne_110m_admin_0_countries.geojson';
+
+async function world(url = WORLD_50M) {
+  const t = await d3.json(url);
+  return { countries: topojson.feature(t, t.objects.countries),
+           borders: topojson.mesh(t, t.objects.countries, (a, b) => a !== b) };
+}
+
+// sea, graticule, land, internal borders. Pass sphere=true for globes and world views.
+function base(svg, path, w, { sphere = false, graticule = true, fill = css('--land') } = {}) {
+  const outline = sphere ? { type: 'Sphere' } : null;
+  if (sphere) svg.append('path').datum(outline).attr('d', path).attr('fill', css('--sea'));
+  else svg.append('rect').attr('width', W).attr('height', H).attr('fill', css('--sea'));
+  if (graticule) svg.append('path').datum(d3.geoGraticule10()).attr('d', path)
+    .attr('fill', 'none').attr('stroke', css('--grat')).attr('stroke-width', .6);
+  const land = svg.append('g');
+  land.selectAll('path').data(w.countries.features).join('path').attr('d', path).attr('fill', fill);
+  svg.append('path').datum(w.borders).attr('d', path).attr('fill', 'none')
+    .attr('stroke', css('--border')).attr('stroke-width', .9).attr('stroke-linejoin', 'round');
+  if (sphere) svg.append('path').datum(outline).attr('d', path).attr('fill', 'none').attr('stroke', css('--grat'));
+  return land;
+}
+
+// text with a halo in the colour underneath, so labels stay readable over lines and borders
+function label(svg, [x, y], text, { size = 13, weight = 400, anchor = 'middle', dy = 0, halo = css('--halo'), fill = css('--ink') } = {}) {
+  return svg.append('text').attr('x', x).attr('y', y + dy).attr('text-anchor', anchor)
+    .attr('font-size', size).attr('font-weight', weight).attr('fill', fill)
+    .attr('paint-order', 'stroke').attr('stroke', halo).attr('stroke-width', 3).attr('stroke-linejoin', 'round').text(text);
+}
+
+// spaced small caps for regions, seas and deserts; never haloed, never bold
+function regionLabel(svg, [x, y], text, size = 11) {
+  return svg.append('text').attr('x', x).attr('y', y).attr('text-anchor', 'middle').attr('font-size', size)
+    .attr('letter-spacing', size * .28).attr('fill', css('--region-label')).text(text.toUpperCase());
+}
+
+// a route drawn twice: a wide halo in the card colour, then the line itself
+function route(svg, path, coords, { width = 3, dash = null, color = css('--accent') } = {}) {
+  const d = { type: 'LineString', coordinates: coords };
+  svg.append('path').datum(d).attr('d', path).attr('fill', 'none').attr('stroke', css('--card'))
+    .attr('stroke-width', width + 4).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+  return svg.append('path').datum(d).attr('d', path).attr('fill', 'none').attr('stroke', color)
+    .attr('stroke-width', width).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round').attr('stroke-dasharray', dash);
+}
+
+// end points are filled accent dots; stops are hollow
+function dot(svg, [x, y], { end = false, r = end ? 6 : 4 } = {}) {
+  return svg.append('circle').attr('cx', x).attr('cy', y).attr('r', r)
+    .attr('fill', end ? css('--accent') : css('--card')).attr('stroke', css('--accent')).attr('stroke-width', 2);
+}
+
+// stepped legend for a choropleth: one swatch per bin, labelled at the breaks
+function stepLegend(svg, [x, y], colors, breaks, title, { sw = 46, fmt = d => d } = {}) {
+  const g = svg.append('g').attr('transform', `translate(${x},${y})`);
+  g.append('text').attr('y', -8).attr('font-size', 12).attr('font-weight', 600).attr('fill', css('--ink')).text(title);
+  colors.forEach((c, i) => g.append('rect').attr('x', i * sw).attr('width', sw - 2).attr('height', 10).attr('fill', c));
+  breaks.forEach((b, i) => g.append('text').attr('x', (i + 1) * sw - 1).attr('y', 24).attr('text-anchor', 'middle')
+    .attr('font-size', 11).attr('fill', css('--muted')).text(fmt(b)));
+  return g;
+}
+
+// nested-circle legend for proportional symbols; r is the same sqrt scale the map uses
+function circleLegend(svg, [x, y], r, values, title, fmt = d => d) {
+  const g = svg.append('g').attr('transform', `translate(${x},${y})`);
+  g.append('text').attr('y', -2 * r(values[0]) - 10).attr('font-size', 12).attr('font-weight', 600).attr('fill', css('--ink')).text(title);
+  values.forEach(v => {
+    g.append('circle').attr('cy', -r(v)).attr('r', r(v)).attr('fill', 'none').attr('stroke', css('--muted'));
+    g.append('line').attr('x1', 0).attr('x2', r(values[0]) + 10).attr('y1', -2 * r(v)).attr('y2', -2 * r(v)).attr('stroke', css('--faint')).attr('stroke-dasharray', '2 2');
+    g.append('text').attr('x', r(values[0]) + 14).attr('y', -2 * r(v) + 4).attr('font-size', 11).attr('fill', css('--muted')).text(fmt(v));
+  });
+  return g;
+}
+
+function header(title, dek, src) {
+  document.title = title;
+  d3.select('#title').text(title); d3.select('#dek').text(dek); d3.select('#src').text(src);
+}
+
+// ---- the map ----
+async function draw() {
+  header('Where Brunei is',
+         'Sultanate on the northern coast of Borneo, bordered entirely by Sarawak, Malaysia',
+         'Base map: Natural Earth via world-atlas.');
+
+  const svg = d3.select('#map');
+  const w = await world();
+
+  // Main map fitted to Borneo with margin
+  const corners = { type: 'MultiPoint', coordinates: [[107.5, -4.8], [120.0, 7.8]] };
+  const proj = d3.geoMercator().fitExtent([[40, 20], [W - 40, H - 20]], corners);
+  const path = d3.geoPath(proj);
+
+  // Sea and graticule
+  const land = base(svg, path, w, { sphere: false, graticule: true });
+
+  // Color countries: Brunei in accent, Malaysia and Indonesia in land-2, others in land
+  land.selectAll('path').attr('fill', d => {
+    const id = d.id;
+    const name = d.properties ? d.properties.name : '';
+    if (id === '096' || name === 'Brunei') return css('--accent');
+    if (id === '458' || name === 'Malaysia' || id === '360' || name === 'Indonesia') return css('--land-2');
+    return css('--land');
+  });
+
+  // Orientation cities
+  const cities = [
+    { name: 'Bandar Seri Begawan', coords: [114.9481, 4.9031], anchor: 'start', dx: 8, dy: 14 },
+    { name: 'Kota Kinabalu', coords: [116.0735, 5.9804], anchor: 'start', dx: 8, dy: -4 },
+    { name: 'Kuching', coords: [110.3592, 1.5533], anchor: 'end', dx: -8, dy: 4 }
+  ];
+
+  cities.forEach(c => {
+    const p = proj(c.coords);
+    dot(svg, p, { end: false, r: 3.5 });
+    label(svg, [p[0] + c.dx, p[1]], c.name, { size: 12, weight: 400, anchor: c.anchor, dy: c.dy, fill: css('--muted') });
+  });
+
+  // Focal place label: Brunei (16px 600) with leader line into open water above-left
+  const pBrunei = proj([114.7, 4.6]);
+  const bruneiLabelPos = [pBrunei[0] - 25, pBrunei[1] - 40];
+  svg.append('line')
+    .attr('x1', pBrunei[0]).attr('y1', pBrunei[1])
+    .attr('x2', bruneiLabelPos[0]).attr('y2', bruneiLabelPos[1] + 4)
+    .attr('stroke', css('--faint')).attr('stroke-width', 0.75);
+  label(svg, bruneiLabelPos, 'Brunei', { size: 16, weight: 600, anchor: 'end', dy: 0, halo: css('--sea') });
+
+  // Region labels
+  regionLabel(svg, [360, 200], 'South China Sea', 12);
+  regionLabel(svg, proj([114.5, 0.0]), 'Borneo', 13);
+
+  // Scale bar: 1px --ink line with round distance (200 km) bottom-right
+  const centerLat = 1.5;
+  const p1 = proj([115.0, centerLat]);
+  const p2 = proj([116.0, centerLat]);
+  const degPx = Math.abs(p2[0] - p1[0]);
+  const kmPerDeg = 111.32 * Math.cos(centerLat * Math.PI / 180);
+  const barLen = 200 * (degPx / kmPerDeg);
+
+  const scaleX = W - 70 - barLen;
+  const scaleY = H - 36;
+  svg.append('line').attr('x1', scaleX).attr('y1', scaleY).attr('x2', scaleX + barLen).attr('y2', scaleY)
+    .attr('stroke', css('--ink')).attr('stroke-width', 1);
+  svg.append('line').attr('x1', scaleX).attr('y1', scaleY - 3).attr('x2', scaleX).attr('y2', scaleY + 3)
+    .attr('stroke', css('--ink')).attr('stroke-width', 1);
+  svg.append('line').attr('x1', scaleX + barLen).attr('y1', scaleY - 3).attr('x2', scaleX + barLen).attr('y2', scaleY + 3)
+    .attr('stroke', css('--ink')).attr('stroke-width', 1);
+  svg.append('text').attr('x', scaleX + barLen / 2).attr('y', scaleY - 6).attr('text-anchor', 'middle')
+    .attr('font-size', 11).attr('fill', css('--ink')).text('200 km');
+
+  // Inset globe per type-locator.md: 220 x 220, top-left over sea, 1px --grat frame, --card bg
+  const ix = 32, iy = 32, iw = 220, ih = 220;
+  const insetG = svg.append('g').attr('transform', `translate(${ix},${iy})`);
+
+  // Frame and background
+  insetG.append('rect').attr('width', iw).attr('height', ih)
+    .attr('fill', css('--card')).attr('stroke', css('--grat')).attr('stroke-width', 1);
+
+  // Inset globe projection
+  const insetProj = d3.geoOrthographic().rotate([-115, -4]).clipAngle(90)
+    .fitExtent([[10, 10], [iw - 10, ih - 10]], { type: 'Sphere' });
+  const insetPath = d3.geoPath(insetProj);
+
+  // Ocean
+  insetG.append('path').datum({ type: 'Sphere' }).attr('d', insetPath).attr('fill', css('--sea'));
+  // Graticule
+  insetG.append('path').datum(d3.geoGraticule10()).attr('d', insetPath)
+    .attr('fill', 'none').attr('stroke', css('--grat')).attr('stroke-width', 0.5);
+
+  // Land features on globe
+  insetG.selectAll('path.land').data(w.countries.features).join('path').attr('class', 'land')
+    .attr('d', insetPath).attr('fill', d => {
+      const id = d.id;
+      const name = d.properties ? d.properties.name : '';
+      if (id === '096' || name === 'Brunei') return css('--accent');
+      if (id === '458' || name === 'Malaysia' || id === '360' || name === 'Indonesia') return css('--land-2');
+      return css('--land');
+    });
+
+  // Borders
+  insetG.append('path').datum(w.borders).attr('d', insetPath).attr('fill', 'none')
+    .attr('stroke', css('--border')).attr('stroke-width', 0.6);
+
+  // Globe outline
+  insetG.append('path').datum({ type: 'Sphere' }).attr('d', insetPath)
+    .attr('fill', 'none').attr('stroke', css('--grat')).attr('stroke-width', 0.8);
+
+  // Extent rectangle on inset: polygon of main map corners in inset projection
+  const mainCorners = [
+    proj.invert([0, 0]),
+    proj.invert([W, 0]),
+    proj.invert([W, H]),
+    proj.invert([0, H])
+  ];
+  const extentPoly = {
+    type: 'Polygon',
+    coordinates: [[mainCorners[0], mainCorners[1], mainCorners[2], mainCorners[3], mainCorners[0]]]
+  };
+  insetG.append('path').datum(extentPoly).attr('d', insetPath)
+    .attr('fill', 'none').attr('stroke', css('--accent')).attr('stroke-width', 1.5);
+}
+draw().then(() => document.body.dataset.ready = '1');
+</script></body></html>
