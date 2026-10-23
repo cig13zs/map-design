@@ -57,8 +57,9 @@ That one rule stops the most common bad map.
    default; `#dark` in the URL switches to the dark theme. Both must work.
 5. Label per [references/labels.md](references/labels.md): place names with `label()`, regions and
    seas with `regionLabel()`, nothing in bold except end points and the focal place.
-6. Render: `python scripts/shot.py map.html map.png` (add `--dark` for the dark version, `--height N`
-   if the card is cut off).
+6. Render: `python <this skill's folder>/scripts/shot.py map.html map.png` (add `--dark` for the dark
+   version, `--height N` if the card is cut off). It needs Chrome, Edge or Chromium; set `CHROME` to
+   the browser's path if it isn't found.
 
 ## 5. Checks before you hand it over
 

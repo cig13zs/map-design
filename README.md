@@ -16,6 +16,12 @@ Every map above was drawn by an agent following the skill, not by hand. The data
 ## Install
 
 ```bash
+npx skills add cig13zs/map-design
+```
+
+It asks which agents to install it for (Claude Code, Codex and others) and copies the whole skill folder: references, template and `shot.py`. Without Node:
+
+```bash
 git clone https://github.com/cig13zs/map-design
 cp -r map-design/skills/map-design ~/.claude/skills/
 ```

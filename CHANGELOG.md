@@ -4,6 +4,7 @@
 
 ### Added
 
+- Install with `npx skills add cig13zs/map-design`; the README says so, and the skill names the path to `shot.py` and the `CHROME` variable.
 - A seventh example, `examples/route-manila-galleon.html`: the Manila galleon routes across the Pacific, with Equal Earth centred on the date line so neither route is cut, both directions labelled along their lines, and chevrons for direction. Light and dark PNGs are in the gallery.
 
 ### Fixed
