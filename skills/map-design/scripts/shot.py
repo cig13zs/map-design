@@ -33,10 +33,19 @@ def main(argv):
         height = (int(vb.group(2)) if vb else 560) + 200  # title, dek, source line and margins
     out = Path(args[1] if len(args) > 1 else src.with_suffix(".png")).resolve()
     url = src.as_uri() + ("#dark" if "--dark" in argv else "")
+    flags = ["--headless=new", "--disable-gpu", "--hide-scrollbars", f"--window-size=1150,{height}",
+             "--virtual-time-budget=15000"]
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        flags.append("--no-sandbox")  # Chrome refuses to start as root (Docker, CI) with the sandbox on
     with tempfile.TemporaryDirectory() as prof:
-        subprocess.run([os.environ.get("CHROME") or browser(), "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                        f"--window-size=1150,{height}", "--virtual-time-budget=15000", f"--user-data-dir={prof}",
-                        f"--screenshot={out}", url], check=True, capture_output=True)
+        try:
+            run = subprocess.run([os.environ.get("CHROME") or browser(), *flags, f"--user-data-dir={prof}",
+                                  f"--screenshot={out}", url], capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired:
+            sys.exit(f"the browser did not finish {src.name} in 120 s; the map loads D3 and the base map from "
+                     "cdn.jsdelivr.net, so check that the network can reach it")
+    if run.returncode != 0 or not out.is_file():
+        sys.exit(f"the browser could not render {src.name}:\n{run.stderr.strip()[-800:]}")
     print(out)
 
 
