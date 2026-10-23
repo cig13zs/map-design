@@ -9,8 +9,9 @@ An agent skill for Claude Code, Codex and other agents that makes maps in the st
 | ![Silk Road route](docs/gallery/route-silk-road.png) | ![Flights from Manila on a globe](docs/gallery/flows-manila.png) |
 | ![Internet use by country](docs/gallery/choropleth-internet.png) | ![Population as circles](docs/gallery/symbols-population.png) |
 | ![Where Brunei is](docs/gallery/locator-brunei.png) | ![Earthquakes, past 30 days](docs/gallery/points-earthquakes.png) |
+| ![The Manila galleons, 1565 to 1815](docs/gallery/route-manila-galleon.png) | ![The same map in the dark theme](docs/gallery/route-manila-galleon-dark.png) |
 
-Every map above was drawn by an agent following the skill, not by hand. The data is real: World Bank and USGS, fetched on 2026-10-19 and written into each file. Dark versions are next to them in [docs/gallery](docs/gallery).
+Every map above was drawn by an agent following the skill, not by hand. The data is real: World Bank and USGS, fetched on 2026-10-19 and written into each file. Dark versions are next to them in [docs/gallery](docs/gallery). The galleon map (added 2026-10-23) is a route that crosses the date line, with Equal Earth centred on the Pacific and small chevrons for direction.
 
 ## Install
 
@@ -42,7 +43,7 @@ skills/map-design/
   references/           style guide, projections, labels, data sources, one file per map type
   assets/template.html  helpers (base map, labels, routes, legends) and the Silk Road example
   scripts/shot.py       HTML to PNG with headless Chrome
-examples/               the six gallery maps
+examples/               the gallery maps
 ```
 
 To change the look, edit the colour tokens at the top of `assets/template.html`. Nothing in the maps hard-codes a colour.
